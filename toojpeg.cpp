@@ -1,6 +1,6 @@
 // //////////////////////////////////////////////////////////
 // toojpeg.cpp
-// written by Stephan Brumme, 2018
+// written by Stephan Brumme, 2018-2019
 // see https://create.stephan-brumme.com/toojpeg/
 //
 
@@ -262,7 +262,7 @@ void generateHuffmanTable(const uint8_t numCodes[16], const uint8_t* values, Huf
   for (uint8_t numBits = 1; numBits <= 16; numBits++)
   {
     // ... and each code of these bitsizes
-    for (uint8_t i = 0; i < numCodes[numBits - 1]; i++) // note numCodes array starts at zero, but smallest bitsize is 1
+    for (uint8_t i = 0; i < numCodes[numBits - 1]; i++) // note: numCodes array starts at zero, but smallest bitsize is 1
     {
       auto current = *values++;
       result[current].code    = code++;
@@ -336,7 +336,7 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
   {
     // look for zero terminator
     auto scan = comment;
-    while (*scan++) ; 
+    while (*scan++) ;
 
     // length: number of bytes (without zero terminator) + 2 bytes for this length field
     uint16_t length = 2 + scan - comment;
@@ -379,8 +379,8 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
   uint8_t quantChrominance[64];
   for (auto i = 0; i < 64; i++)
   {
-    int luminance   = (DefaultQuantLuminance  [i] * quality + 50) / 100;
-    int chrominance = (DefaultQuantChrominance[i] * quality + 50) / 100;
+    int16_t luminance   = (DefaultQuantLuminance  [i] * quality + 50) / 100;
+    int16_t chrominance = (DefaultQuantChrominance[i] * quality + 50) / 100;
 
     // clamp to 1..255
     quantLuminance  [ZigZag[i]] = uint8_t(clamp(luminance,   1, 255));
@@ -427,12 +427,12 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
   HuffmanCode huffmanChrominanceAC[256];
 
   // DHT marker - define Huffman tables
-  writeMarker(output, 0xC4, isRGB ? (2+2*208) : (2+208));
-                                  //  2 bytes for the length field
+  writeMarker(output, 0xC4, isRGB ? (2+208+208) : (2+208));
+                                  // 2 bytes for the length field, store chrominance only if needed
                                   //   1+16+12  for the DC luminance
-                                  //   1+16+162 for the AC luminance
+                                  //   1+16+162 for the AC luminance   (208 = 1+16+12 + 1+16+162)
                                   //   1+16+12  for the DC chrominance
-                                  //   1+16+162 for the AC chrominance
+                                  //   1+16+162 for the AC chrominance (208 = 1+16+12 + 1+16+162, same as above)
 
   // Huffman definitions for first DC table
   static const uint8_t DcLuminanceCodesPerBitsize[16] = { 0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0 }; // sum = 12
@@ -533,7 +533,7 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
     scaledChrominance[i] = factor / quantChrominance[ZigZag[i]];
   }
 
-  // used to write bits to output
+  // all encoded bits pass through this buffer, it writes to output whenever a byte is completed
   BitBuffer buffer;
 
   // just convert image data from void*
@@ -552,7 +552,7 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
   for (auto mcuY = 0; mcuY < height; mcuY += 8 * sampling)
     for (auto mcuX = 0; mcuX < width; mcuX += 8 * sampling)
     {
-      // break down the image into 8x8 blocks, convert from RGB or grayscale to YCbCr and then run JUPEG's compression algorithm
+      // break down the image into 8x8 blocks, convert from RGB or grayscale to YCbCr and then run JPEG's compression algorithm
       float Y[8][8], Cb[8][8], Cr[8][8];
 
       // YCbCr 4:4:4 format: each MCU is a 8x8 block - the same applies to grayscale images, too
@@ -648,10 +648,10 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
           Cr[deltaY][deltaX] = (+0.5f      * r -0.418688f * g -0.081312f * b) / numSamples; // => just 2 divisions instead of 3 (for r,g,b)
         }
 
-        // encode DUs (Cb + Cr channels)
-        lastCbDC = processDU(output, buffer, Cb, scaledChrominance, lastCbDC, huffmanChrominanceDC, huffmanChrominanceAC);
-        lastCrDC = processDU(output, buffer, Cr, scaledChrominance, lastCrDC, huffmanChrominanceDC, huffmanChrominanceAC);
-      }
+      // encode DUs (Cb + Cr channels)
+      lastCbDC = processDU(output, buffer, Cb, scaledChrominance, lastCbDC, huffmanChrominanceDC, huffmanChrominanceAC);
+      lastCrDC = processDU(output, buffer, Cr, scaledChrominance, lastCrDC, huffmanChrominanceDC, huffmanChrominanceAC);
+    }
 
   // fill remaining bits with 1s
   writeBits(output, buffer, { 0x7F, 7 });
