@@ -25,5 +25,5 @@ void myOutput(unsigned char oneByte) { fputc(oneByte, myFileHandle); }
 ```cpp
 writeJpeg(myOutput, mypixels, 1024, 768);
 // actually there are some optional parameters, too
-//bool ok = tooJpeg(writeByte, pixels, width, height, isRGB, quality, downSample, comment);
+//bool ok = tooJpeg(writeByte, pixels, width, height, imgType, quality, downSample, comment);
 ```
