@@ -278,17 +278,16 @@ void generateHuffmanTable(const uint8_t numCodes[16], const uint8_t* values, Huf
 // -------------------- the only externally visible function ... --------------------
 
 namespace TooJpeg
-{
-
+{  
 // handle       - callback that stores a single byte (writes to disk, memory, ...)
 // width,height - image size
 // pixels       - stored in RGB format or grayscale, stored from upper-left to lower-right
-// isRGB        - true if RGB format (3 bytes per pixel); false if grayscale (1 byte per pixel)
+// imgType      - GRAYSCALE, RGB or YUVU... see above
 // quality      - between 1 (worst) and 100 (best)
 // downSample   - if true then YCbCr 4:2:0 format is used (smaller size, minor quality loss) instead of 4:4:4, not relevant for grayscale
 // comment      - optional JPEG comment (0/NULL if no comment)
 bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned short width_, unsigned short height_,
-               bool isRGB, unsigned char quality_, bool downSample, const char* comment)
+               int imgType, unsigned char quality_, bool downSample, const char* comment)
 {
   // reject invalid pointers
   if (!output || !pixels_)
@@ -307,6 +306,7 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
   quality = quality < 50 ? 5000 / quality : 200 - quality * 2;
 
   // number of components
+  bool isRGB = (imgType != IMGTYPE_GRAYSCALE);
   uint8_t numComponents = isRGB ? 3 : 1;
   // note: if there is just one component (=grayscale), then only luminance needs to be stored in the file
   //       thus everything related to chrominance need not to be written to the JPEG
@@ -567,27 +567,54 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
               // find actual pixel position within the current image
               auto column   = clamp(mcuX + deltaX + blockX, 0, width  - 1); // must not exceed image borders, replicate last row/column if needed
               auto row      = clamp(mcuY + deltaY + blockY, 0, height - 1);
-              // RGB: 3 bytes per pixel, grayscale: 1 byte per pixel
-              auto pixelPos = (row * width + column) * numComponents; 
 
-              // grayscale images have solely a Y channel which can be easily derived from the input pixel by shifting it by 128
-              if (!isRGB)
+              switch(imgType)
               {
+              case IMGTYPE_GRAYSCALE: 
+                {
+                // grayscale: 1 byte per pixel
+                auto pixelPos = (row * width + column);
+                // grayscale images have solely a Y channel which can be easily derived from the input pixel by shifting it by 128
                 Y[deltaY][deltaX] = pixels[pixelPos] - 128.f;
-                continue;
-              }
+                break;
+                }
+              case IMGTYPE_RGB: 
+                {
+                // RGB: 3 bytes per pixel
+                auto pixelPos = (row * width + column) * 3; 
+                auto r = pixels[pixelPos    ];
+                auto g = pixels[pixelPos + 1];
+                auto b = pixels[pixelPos + 2];
 
-              auto r = pixels[pixelPos    ];
-              auto g = pixels[pixelPos + 1];
-              auto b = pixels[pixelPos + 2];
+                // convert to YCbCr, constants are similar to ITU-R, see https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
+                Y[deltaY][deltaX] = +0.299f    * r +0.587f    * g +0.114f    * b - 128.f;
 
-              // convert to YCbCr, constants are similar to ITU-R, see https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
-              Y   [deltaY][deltaX] = +0.299f    * r +0.587f    * g +0.114f    * b - 128.f;
-
-              if (isYCbCr444)
-              {
-                Cb[deltaY][deltaX] = -0.168736f * r -0.331264f * g +0.5f      * b;
-                Cr[deltaY][deltaX] = +0.5f      * r -0.418688f * g -0.081312f * b;
+                if (isYCbCr444)
+                {
+                  Cb[deltaY][deltaX] = -0.168736f * r -0.331264f * g +0.5f      * b;
+                  Cr[deltaY][deltaX] = +0.5f      * r -0.418688f * g -0.081312f * b;
+                }
+                break; 
+                }
+              case IMGTYPE_YUVU:
+                {
+                auto pixelPos = (row * width + column) * 2; 
+                Y[deltaY][deltaX] = pixels[pixelPos] - 128.f;
+                if (isYCbCr444)
+                {
+                  if (column % 2)
+                  {
+                    Cb[deltaY][deltaX] = pixels[pixelPos - 1] - 128.f;
+                    Cr[deltaY][deltaX] = pixels[pixelPos + 1] - 128.f;
+                  }
+                  else
+                  {
+                    Cb[deltaY][deltaX] = pixels[pixelPos + 1] - 128.f;
+                    Cr[deltaY][deltaX] = pixels[pixelPos + 3] - 128.f;
+                  }
+                }
+                break; 
+                }
               }
             }
 
@@ -633,19 +660,42 @@ bool writeJpeg(TooJpeg::WRITE_ONE_BYTE output, const void* pixels_, unsigned sho
           }
 
           // let's add all four samples (computing their average is slightly deferred, see about 10 lines below)
-          auto r = 0, g = 0, b = 0;
-          auto numSamples = sampling * sampling;
-          for (auto s = 0; s < numSamples; s++)
-          {
-            auto pixelPosSample = (row * width + column + offsets[s]) * numComponents;
-            r += pixels[pixelPosSample    ];
-            g += pixels[pixelPosSample + 1];
-            b += pixels[pixelPosSample + 2];
-          }
+          switch(imgType)
+            {
+            case IMGTYPE_RGB: 
+              {
+              auto r = 0, g = 0, b = 0;
+              auto numSamples = sampling * sampling;
+              for (auto s = 0; s < numSamples; s++)
+              {
+                auto pixelPosSample = (row * width + column + offsets[s]) * 3;
+                r += pixels[pixelPosSample    ];
+                g += pixels[pixelPosSample + 1];
+                b += pixels[pixelPosSample + 2];
+              }
 
-          // convert to YCbCr, constants are similar to ITU-R, see https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
-          Cb[deltaY][deltaX] = (-0.168736f * r -0.331264f * g +0.5f      * b) / numSamples; // I deferred the division up to here for faster speed
-          Cr[deltaY][deltaX] = (+0.5f      * r -0.418688f * g -0.081312f * b) / numSamples; // => just 2 divisions instead of 3 (for r,g,b)
+              // convert to YCbCr, constants are similar to ITU-R, see https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
+              Cb[deltaY][deltaX] = (-0.168736f * r -0.331264f * g +0.5f      * b) / numSamples; // I deferred the division up to here for faster speed
+              Cr[deltaY][deltaX] = (+0.5f      * r -0.418688f * g -0.081312f * b) / numSamples; // => just 2 divisions instead of 3 (for r,g,b)
+              break; 
+              }
+            case IMGTYPE_YUVU:
+              {
+              auto b = 0, r = 0;
+              auto numSamples = sampling * sampling;
+              for (auto s = 0; s < numSamples; s+=2) // YUVU has already 1 sample for 2 pixels, so we need only to make the mean of two samples
+              {
+                auto pixelPosSample = (row * width + column + offsets[s]) * 2;
+                b += (pixels[pixelPosSample + 1] - 128.f);
+                r += (pixels[pixelPosSample + 3] - 128.f);
+              }
+
+              // convert to YCbCr, constants are similar to ITU-R, see https://en.wikipedia.org/wiki/YCbCr#JPEG_conversion
+              Cb[deltaY][deltaX] = b / (numSamples / 2); // We have only two samples here!
+              Cr[deltaY][deltaX] = r / (numSamples / 2); 
+              break; 
+              }
+            }          
         }
 
       // encode DUs (Cb + Cr channels)
