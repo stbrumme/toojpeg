@@ -23,7 +23,7 @@ void myOutput(unsigned char oneByte) { fputc(oneByte, myFileHandle); }
 3. start JPEG compression
 
 ```cpp
-writeJpeg(myOutput, mypixels, 1024, 768);
+TooJpeg::writeJpeg(myOutput, mypixels, 1024, 768);
 // actually there are some optional parameters, too
-//bool ok = tooJpeg(writeByte, pixels, width, height, isRGB, quality, downSample, comment);
+//bool ok = TooJpeg::writeJpeg(writeByte, pixels, width, height, isRGB, quality, downSample, comment);
 ```
