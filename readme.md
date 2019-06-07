@@ -1,9 +1,20 @@
 # A JPEG encoder in a single C++ file
 
-This is a mirror of my library hosted at https://create.stephan-brumme.com/toojpeg/
+*This is a mirror of my library hosted at* https://create.stephan-brumme.com/toojpeg/
 
-This is a compact baseline JPEG/JFIF writer, written in C++ (but looks like C for the most part).
-Its interface has only one function: writeJpeg() - and that's it !
+TooJpeg is a compact baseline JPEG/JFIF writer, written in C++11 (but looks like C for the most part).
+Its interface has only one function: `writeJpeg()` - and that's it !
+
+My library supports the most common JPEG output color spaces:
+- YCbCr444,
+- YCbCr420 (=2x2 downsampled) and
+- Y (grayscale)
+
+Saving NASA's huge 21600x10800px [blue marble image](https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/land_shallow_topo_21600.tif) with quality=90 takes just 2.8 (YCbCr420) or 4 seconds (YCbCr444) on a standard x64 machine - faster than other small JPEG encoders.
+
+The compiled library enlarges your binary by about 7kb (CLang x64) or 12kb (GCC x64) in -O3 mode.
+
+Far more details can be found on the project homepage: https://create.stephan-brumme.com/toojpeg/
 
 # How to use
 
