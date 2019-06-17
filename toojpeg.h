@@ -45,10 +45,10 @@ namespace TooJpeg
 // And I managed to remove the need for any external includes ...
 // yes, that's right: my library has no (!) includes at all, not even #include <stdlib.h>
 // Depending on your callback WRITE_ONE_BYTE, the library writes either to disk, or in-memory, or wherever you wish.
-// Moreover, no dynamic memory allocation are performed, just a few bytes on the stack (less than 10k).
+// Moreover, no dynamic memory allocations are performed, just a few bytes on the stack.
 //
 // In contrast to Jon's code, compression can be significantly improved in many use cases:
-// a) grayscale JPEG images need just a single Y channel, no need to save the redundant Cb + Cr channels
+// a) grayscale JPEG images need just a single Y channel, no need to save the superfluous Cb + Cr channels
 // b) YCbCr 4:2:0 downsampling is often about 20% more efficient (=smaller) than the default YCbCr 4:4:4 with only little visual loss
 //
 // TooJpeg 1.2+ compresses about twice as fast as jo_jpeg (and about half as fast as libjpeg-turbo).
@@ -57,6 +57,6 @@ namespace TooJpeg
 // Last but not least you can optionally add a JPEG comment.
 //
 // Your C++ compiler needs to support a reasonable subset of C++11 (g++ 4.7 or Visual C++ 2013 are sufficient).
-// I haven't tested the code on ARM chips, big-endian systems or anything that smells like an apple.
+// I haven't tested the code on big-endian systems or anything that smells like an apple.
 //
 // USE AT YOUR OWN RISK. Because you are a brave soul :-)
