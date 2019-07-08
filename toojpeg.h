@@ -25,15 +25,15 @@ namespace TooJpeg
   // if you prefer stylish C++11 syntax then it can be a lambda, too:
   // auto myOutput = [](unsigned char oneByte) { fputc(oneByte, output); };
 
-  // handle       - callback that stores a single byte (writes to disk, memory, ...)
-  // width,height - image size
+  // output       - callback that stores a single byte (writes to disk, memory, ...)
   // pixels       - stored in RGB format or grayscale, stored from upper-left to lower-right
+  // width,height - image size
   // isRGB        - true if RGB format (3 bytes per pixel); false if grayscale (1 byte per pixel)
   // quality      - between 1 (worst) and 100 (best)
   // downsample   - if true then YCbCr 4:2:0 format is used (smaller size, minor quality loss) instead of 4:4:4, not relevant for grayscale
   // comment      - optional JPEG comment (0/NULL if no comment), must not contain ASCII code 0xFF
   bool writeJpeg(WRITE_ONE_BYTE output, const void* pixels, unsigned short width, unsigned short height,
-                 bool isRGB = true, unsigned char quality = 90, bool downsample = false, const char* comment = 0);
+                 bool isRGB = true, unsigned char quality = 90, bool downsample = false, const char* comment = nullptr);
 } // namespace TooJpeg
 
 // My main inspiration was Jon Olick's Minimalistic JPEG writer

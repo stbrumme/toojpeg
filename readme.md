@@ -2,7 +2,7 @@
 
 *This is a mirror of my library hosted at* https://create.stephan-brumme.com/toojpeg/
 
-TooJpeg is a compact baseline JPEG/JFIF writer, written in C++11 (but looks like C for the most part).
+TooJpeg is a compact baseline JPEG/JFIF writer, written in C++11 (but looks like C for the most part).  
 Its interface has only one function: `writeJpeg()` - and that's it !
 
 My library supports the most common JPEG output color spaces:
@@ -35,5 +35,5 @@ void myOutput(unsigned char oneByte) { fputc(oneByte, myFileHandle); }
 ```cpp
 TooJpeg::writeJpeg(myOutput, mypixels, 1024, 768);
 // actually there are some optional parameters, too
-//bool ok = TooJpeg::writeJpeg(writeByte, pixels, width, height, isRGB, quality, downSample, comment);
+//bool ok = TooJpeg::writeJpeg(myOutput, pixels, width, height, isRGB, quality, downSample, comment);
 ```
