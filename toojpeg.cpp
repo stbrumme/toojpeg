@@ -109,8 +109,9 @@ struct BitWriter
 {
   // user-supplied callback that writes/stores one byte
   TooJpeg::WRITE_ONE_BYTE output;
+  void* data_ptr;
   // initialize writer
-  explicit BitWriter(TooJpeg::WRITE_ONE_BYTE output_) : output(output_) {}
+  explicit BitWriter(TooJpeg::WRITE_ONE_BYTE output_,void* data_ptr_) : output(output_), data_ptr(data_ptr_) {}
 
   // store the most recently encoded bits that are not written yet
   struct BitBuffer
@@ -133,10 +134,10 @@ struct BitWriter
       // extract highest 8 bits
       buffer.numBits -= 8;
       auto oneByte = uint8_t(buffer.data >> buffer.numBits);
-      output(oneByte);
+      output(oneByte, data_ptr);
 
       if (oneByte == 0xFF) // 0xFF has a special meaning for JPEGs (it's a block marker)
-        output(0);         // therefore pad a zero to indicate "nope, this one ain't a marker, it's just a coincidence"
+        output(0, data_ptr);         // therefore pad a zero to indicate "nope, this one ain't a marker, it's just a coincidence"
 
       // note: I don't clear those written bits, therefore buffer.bits may contain garbage in the high bits
       //       if you really want to "clean up" (e.g. for debugging purposes) then uncomment the following line
@@ -156,7 +157,7 @@ struct BitWriter
   // write a single byte
   BitWriter& operator<<(uint8_t oneByte)
   {
-    output(oneByte);
+    output(oneByte,data_ptr);
     return *this;
   }
 
@@ -165,16 +166,16 @@ struct BitWriter
   BitWriter& operator<<(T (&manyBytes)[Size])
   {
     for (auto c : manyBytes)
-      output(c);
+      output(c, data_ptr);
     return *this;
   }
 
   // start a new JFIF block
   void addMarker(uint8_t id, uint16_t length)
   {
-    output(0xFF); output(id);     // ID, always preceded by 0xFF
-    output(uint8_t(length >> 8)); // length of the block (big-endian, includes the 2 length bytes as well)
-    output(uint8_t(length & 0xFF));
+    output(0xFF, data_ptr); output(id, data_ptr);     // ID, always preceded by 0xFF
+    output(uint8_t(length >> 8), data_ptr); // length of the block (big-endian, includes the 2 length bytes as well)
+    output(uint8_t(length & 0xFF), data_ptr);
   }
 };
 
@@ -345,8 +346,9 @@ void generateHuffmanTable(const uint8_t numCodes[16], const uint8_t* values, Bit
 
 namespace TooJpeg
 {
+
 // the only exported function ...
-bool writeJpeg(WRITE_ONE_BYTE output, const void* pixels_, unsigned short width, unsigned short height,
+bool writeJpeg(WRITE_ONE_BYTE output, void* data_ptr, const void* pixels_, unsigned short width, unsigned short height,
                bool isRGB, unsigned char quality_, bool downsample, const char* comment)
 {
   // reject invalid pointers
@@ -367,7 +369,7 @@ bool writeJpeg(WRITE_ONE_BYTE output, const void* pixels_, unsigned short width,
     downsample = false;
 
   // wrapper for all output operations
-  BitWriter bitWriter(output);
+  BitWriter bitWriter(output, data_ptr);
 
   // ////////////////////////////////////////
   // JFIF headers
@@ -634,8 +636,8 @@ bool writeJpeg(WRITE_ONE_BYTE output, const void* pixels_, unsigned short width,
             auto b = short(pixels[pixelPos + 2]) + pixels[right + 2] + pixels[down + 2] + pixels[downRight + 2];
 
             // convert to Cb and Cr
-            Cb[deltaY][deltaX] = rgb2cb(r, g, b) / 4; // I still have to divide r,g,b by 4 to get their average values
-            Cr[deltaY][deltaX] = rgb2cr(r, g, b) / 4; // it's a bit faster if done AFTER CbCr conversion
+            Cb[deltaY][deltaX] = rgb2cb(static_cast<float>(r), static_cast<float>(g), static_cast<float>(b)) / 4; // I still have to divide r,g,b by 4 to get their average values
+            Cr[deltaY][deltaX] = rgb2cr(static_cast<float>(r), static_cast<float>(g), static_cast<float>(b)) / 4; // it's a bit faster if done AFTER CbCr conversion
 
             // step forward to next 2x2 area
             pixelPos += 2*3; // 2 pixels => 6 bytes (2*numComponents)
